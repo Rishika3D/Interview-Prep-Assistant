@@ -1,0 +1,165 @@
+.practice-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  z-index: 1000;
+}
+
+.practice-content {
+  background: white;
+  border-radius: 12px;
+  padding: 32px;
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.practice-content h2 {
+  color: #333;
+  margin-bottom: 20px;
+}
+
+.question-box {
+  background: #f5f5f5;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border-left: 4px solid #667eea;
+}
+
+.question-box p {
+  color: #666;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.practice-content textarea {
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.score-display {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.score-circle {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  color: white;
+}
+
+.score-number {
+  font-size: 48px;
+  font-weight: bold;
+}
+
+.score-label {
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.feedback-text {
+  color: #666;
+  line-height: 1.8;
+  margin-bottom: 20px;
+  font-size: 15px;
+}
+
+.feedback-lists {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.strengths,
+.improvements {
+  background: #f9f9f9;
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.strengths {
+  border-left: 4px solid #4caf50;
+}
+
+.improvements {
+  border-left: 4px solid #ff9800;
+}
+
+.strengths h4 {
+  color: #2e7d32;
+  margin: 0 0 12px 0;
+  font-size: 14px;
+}
+
+.improvements h4 {
+  color: #e65100;
+  margin: 0 0 12px 0;
+  font-size: 14px;
+}
+
+.strengths ul,
+.improvements ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.strengths li,
+.improvements li {
+  color: #666;
+  padding: 4px 0;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.strengths li:before {
+  content: "✓ ";
+  color: #4caf50;
+  font-weight: bold;
+  margin-right: 4px;
+}
+
+.improvements li:before {
+  content: "• ";
+  color: #ff9800;
+  margin-right: 4px;
+}
+
+.practice-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.practice-actions button {
+  flex: 1;
+  margin: 0;
+}
+
+@media (max-width: 600px) {
+  .practice-content {
+    padding: 20px;
+  }
+
+  .feedback-lists {
+    grid-template-columns: 1fr;
+  }
+}

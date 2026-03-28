@@ -1,0 +1,40 @@
+.question-form {
+  background: white;
+  padding: 24px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.question-form h3 {
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.question-form input,
+.question-form textarea,
+.question-form select {
+  margin-bottom: 0;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.form-row select {
+  margin-bottom: 0;
+}
+
+.question-form button {
+  align-self: flex-start;
+  margin-top: 8px;
+}
+
+@media (max-width: 600px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+}
