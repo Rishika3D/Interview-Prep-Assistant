@@ -21,11 +21,12 @@ def submit_attempt():
     if not question:
         return jsonify({'error': 'Question not found'}), 404
 
-    # Get AI feedback
+    # Get AI feedback (category-aware prompt selection)
     feedback_result = ai_service.evaluate_answer(
         question=question.content,
         expected_answer=question.expected_answer or "Not specified",
-        user_answer=data.user_answer
+        user_answer=data.user_answer,
+        category=question.category
     )
 
     attempt = Attempt(
