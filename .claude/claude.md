@@ -9,7 +9,7 @@ A full-stack application for practicing interview questions with AI-powered feed
 ## Architecture
 - **Backend**: Python Flask API with SQLAlchemy ORM, SQLite database
 - **Frontend**: React SPA with Axios for API calls
-- **AI**: Claude API for evaluating interview answers
+- **AI**: Groq API (Llama 3.3 70B) for evaluating interview answers
 
 ## Code Standards & Practices
 
@@ -53,13 +53,13 @@ The `AIFeedbackService.evaluate_answer()` method:
 - Fallback values provided if API fails
 
 ## Security Checklist
-- [ ] All user inputs validated with Pydantic schemas
-- [ ] Passwords hashed with bcrypt (never logged)
-- [ ] JWT tokens validated on every protected route
-- [ ] CORS properly configured (not `*`)
-- [ ] Database queries use parameterized statements (SQLAlchemy)
-- [ ] User can only see/edit their own questions and attempts
-- [ ] Error messages don't leak sensitive information
+- [x] All user inputs validated with Pydantic schemas
+- [x] Passwords hashed with bcrypt (never logged)
+- [x] JWT tokens validated on every protected route
+- [x] CORS properly configured (not `*`)
+- [x] Database queries use parameterized statements (SQLAlchemy)
+- [x] User can only see/edit their own questions and attempts
+- [x] Error messages don't leak sensitive information
 
 ## Testing Strategy
 - Test authentication flows (signup, login, token validation)

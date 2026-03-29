@@ -40,6 +40,7 @@ instance/
 .env.local
 .env.*.local
 .env.example
+backend/.env
 
 # Node
 node_modules/
