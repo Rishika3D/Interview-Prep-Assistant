@@ -1,6 +1,9 @@
-import anthropic
+from groq import Groq
 import json
+import logging
 import os
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_DESIGN_CRITERIA = """
 Evaluate across these dimensions:
@@ -16,11 +19,12 @@ Evaluate across these dimensions:
 
 class AIFeedbackService:
     def __init__(self):
-        self.client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
+        self.client = Groq(api_key=os.getenv('GROQ_API_KEY'))
+        self.model = 'llama-3.3-70b-versatile'
 
     def evaluate_answer(self, question: str, expected_answer: str, user_answer: str, category: str = 'General') -> dict:
         """
-        Evaluate user's interview answer using Claude AI.
+        Evaluate user's interview answer using Groq (Llama 3.3 70B).
         Uses category-specific prompts for richer, more relevant feedback.
         Returns: {score, feedback, strengths, improvements}
         """
@@ -43,6 +47,7 @@ Respond with ONLY valid JSON (no markdown, no extra text):
 }}
 
 Score guide: 85+ covers all dimensions well, 65-84 covers most, below 65 misses key areas."""
+
         elif category == 'Behavioral':
             prompt = f"""You are an expert interviewer evaluating a behavioral interview answer using the STAR method.
 
@@ -59,6 +64,7 @@ Respond with ONLY valid JSON (no markdown, no extra text):
     "strengths": ["<STAR strength>", "<communication strength>"],
     "improvements": ["<missing STAR element or vagueness>", "<improvement area>"]
 }}"""
+
         else:
             prompt = f"""You are an expert interview coach evaluating a candidate's answer.
 
@@ -76,20 +82,39 @@ Evaluate the answer and respond with ONLY valid JSON (no markdown, no extra text
 
 Be constructive but honest. Score 80+ for good answers, 50-80 for adequate answers."""
 
-        response = self.client.messages.create(
-            model="claude-opus-4-6",
-            max_tokens=500,
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
-        )
+        logger.info(f"Requesting AI evaluation — category={category} model={self.model}")
 
-        # Parse JSON response
         try:
-            result = json.loads(response.content[0].text)
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=500,
+                temperature=0.3,
+            )
+        except Exception as e:
+            logger.error(f"Groq API call failed: {e}", exc_info=True)
+            return {
+                "score": 50,
+                "feedback": "AI service is temporarily unavailable. Please try again.",
+                "strengths": [],
+                "improvements": ["Try again in a moment"]
+            }
+
+        text = response.choices[0].message.content.strip()
+
+        # Strip markdown code fences if present
+        if text.startswith('```'):
+            text = text.split('```')[1]
+            if text.startswith('json'):
+                text = text[4:]
+            text = text.strip()
+
+        try:
+            result = json.loads(text)
+            logger.info(f"AI evaluation complete — score={result.get('score')}")
             return result
-        except (json.JSONDecodeError, IndexError, KeyError):
-            # Fallback if parsing fails
+        except (json.JSONDecodeError, IndexError, KeyError) as e:
+            logger.error(f"Failed to parse AI response as JSON: {e}. Raw response: {text[:200]}")
             return {
                 "score": 50,
                 "feedback": "Unable to evaluate at this time. Please try again.",

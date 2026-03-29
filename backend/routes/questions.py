@@ -6,12 +6,36 @@ from backend.schemas import QuestionCreate, QuestionUpdate
 
 questions_bp = Blueprint('questions', __name__, url_prefix='/api/questions')
 
+from backend.seed import SAMPLE_QUESTIONS
+
 @questions_bp.route('', methods=['GET'])
 @jwt_required()
 def list_questions():
     user_id = get_jwt_identity()
-    questions = Question.query.filter_by(user_id=user_id).all()
-    return jsonify([q.to_dict() for q in questions]), 200
+    user_questions = Question.query.filter_by(user_id=user_id).all()
+    
+    mock_questions_data = []
+    for q in SAMPLE_QUESTIONS:
+        mock = dict(q)
+        if not mock['title'].startswith('Mock Question: '):
+            mock['title'] = "Mock Question: " + mock['title']
+        mock_questions_data.append(mock)
+
+    mock_titles = [m['title'] for m in mock_questions_data]
+    existing_mock_titles = {q.title for q in user_questions if q.title in mock_titles}
+    
+    new_mocks_added = False
+    for mock in mock_questions_data:
+        if mock['title'] not in existing_mock_titles:
+            q = Question(user_id=user_id, **mock)
+            db.session.add(q)
+            new_mocks_added = True
+            
+    if new_mocks_added:
+        db.session.commit()
+        user_questions = Question.query.filter_by(user_id=user_id).all()
+        
+    return jsonify([q.to_dict() for q in user_questions]), 200
 
 @questions_bp.route('', methods=['POST'])
 @jwt_required()

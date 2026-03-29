@@ -73,19 +73,46 @@ export default function Dashboard({ onLogout }) {
           )}
         </div>
 
-        {questions.length === 0 ? (
-          <p className="empty-state">No questions yet. Create one to get started!</p>
-        ) : (
-          <div className="questions-grid">
-            {questions.map(q => (
-              <QuestionCard
-                key={q.id}
-                question={q}
-                onDelete={() => handleDeleteQuestion(q.id)}
-              />
-            ))}
-          </div>
-        )}
+        {(() => {
+          const userQs = questions.filter(q => !q.title.startsWith('Mock Question:'));
+          const mockQs = questions.filter(q => q.title.startsWith('Mock Question:'));
+          
+          return (
+            <>
+              {userQs.length === 0 ? (
+                <p className="empty-state">No custom questions yet. Create one to get started!</p>
+              ) : (
+                <>
+                  <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: 'var(--text-color)' }}>Your Questions</h2>
+                  <div className="questions-grid">
+                    {userQs.map(q => (
+                      <QuestionCard
+                        key={q.id}
+                        question={q}
+                        onDelete={() => handleDeleteQuestion(q.id)}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {mockQs.length > 0 && (
+                <>
+                  <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', marginTop: '2.5rem', color: 'var(--text-color)' }}>Mock Questions</h2>
+                  <div className="questions-grid">
+                    {mockQs.map(q => (
+                      <QuestionCard
+                        key={q.id}
+                        question={q}
+                        onDelete={null}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          );
+        })()}
       </div>
     </div>
   );

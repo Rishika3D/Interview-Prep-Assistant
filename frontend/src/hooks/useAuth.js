@@ -7,7 +7,7 @@ export const useAuth = () => {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (token) {
+    if (token && token !== 'null' && token !== 'undefined') {
       api.setAuthToken(token);
       api.getCurrentUser()
         .then(res => setUser(res.data))

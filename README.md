@@ -1,243 +1,320 @@
 # Interview Prep Assistant
 
-An AI-powered interview preparation tool built with Python Flask, React, and Claude API. Users can create interview questions, practice answering them, and receive personalized AI-generated feedback.
+An AI-powered interview preparation platform where users build a personal question bank, practice answering questions, and receive instant structured feedback — scored 0–100 with strengths and improvement areas — powered by Groq (Llama 3.3 70B).
+
+**Stack:** Python · Flask · SQLite · React · Vite · JWT · Pydantic · Groq AI · Pytest
+
+---
+
+## What It Does
+
+| Feature | Description |
+|---|---|
+| Question Bank | Create, edit, delete questions across 5 categories |
+| Practice Mode | Type your answer and get AI feedback in seconds |
+| Category-Aware AI | System Design questions evaluated on architecture; Behavioral on STAR method |
+| Score History | Every attempt saved — track improvement over time |
+| User Isolation | Each user sees only their own questions and attempts |
+| Seed Questions | 9 pre-built questions across System Design, Behavioral, and Technical |
+
+---
 
 ## Quick Start
 
 ### Prerequisites
-- Python 3.9+
-- Node.js 16+
-- Anthropic API key
+- Python 3.11+
+- Node.js 18+
+- [Groq API key](https://console.groq.com) (free)
 
-### Setup
+### 1. Clone & configure
 
-1. **Clone and enter directory**
 ```bash
-cd /Users/ashi/interview-prep-assessment
+git clone <repo-url>
+cd interview-prep-assessment
+
+cp .env.example .env
+# Open .env and fill in your GROQ_API_KEY and a JWT_SECRET_KEY
 ```
 
-2. **Backend Setup**
+### 2. Backend
+
 ```bash
-cd backend
-pip install -r requirements.txt
-cp ../.env.example ../.env
-# Edit .env and add your ANTHROPIC_API_KEY
-python app.py
+python3.11 -m venv venv
+source venv/bin/activate      # Windows: venv\Scripts\activate
+
+pip install -r backend/requirements.txt
+python -m backend.app         # starts on http://localhost:5005
 ```
 
-Backend runs on `http://localhost:5000`
+### 3. Seed sample questions (optional)
 
-3. **Frontend Setup** (in new terminal)
+```bash
+python -m backend.seed
+# Creates demo@example.com / demo123 with 9 pre-built questions
+```
+
+### 4. Frontend
+
 ```bash
 cd frontend
 npm install
-npm run dev
+npm run dev                   # starts on http://localhost:3000
 ```
 
-Frontend runs on `http://localhost:3000`
+Open `http://localhost:3000` — the Vite proxy forwards all `/api` calls to Flask on 5005.
 
-## Features
+---
 
-✅ **User Authentication**
-- Sign up / Login with email
-- JWT-based session management
-- Password hashing with bcrypt
+## Running Tests
 
-✅ **Question Management**
-- Create interview questions with categories and difficulty levels
-- Store expected answer key points
-- Edit and delete questions
+```bash
+source venv/bin/activate
+pytest backend/tests/ -v
+```
 
-✅ **Practice Mode**
-- Answer interview questions in real-time
-- Get AI-powered feedback instantly
-- Receive score, strengths, and improvement areas
+Tests use an **in-memory SQLite database** and **mock the Groq API** — no real API key needed. 20 tests covering auth, CRUD, user isolation, and feedback submission.
 
-✅ **Progress Tracking**
-- View attempt history
-- See feedback from previous attempts
-- Track performance trends
+```
+backend/tests/
+├── conftest.py        # fixtures, in-memory DB, helper functions
+├── test_auth.py       # signup, login, token validation, edge cases
+├── test_questions.py  # CRUD, category/difficulty validation, user isolation
+└── test_attempts.py   # feedback submission, cross-user access denied
+```
 
-## Technical Decisions
+---
 
-### Backend: Flask + SQLAlchemy
-- **Why**: Lightweight, easy to understand, great for rapid prototyping
-- **Trade-off**: Simple but not production-scaled; suitable for this assessment
+## Architecture
 
-### Database: SQLite
-- **Why**: Zero setup, works locally, good for demos
-- **Trade-off**: Not suitable for concurrent users or production; would migrate to PostgreSQL
+```
+React (port 3000)
+    │  /api/* → Vite proxy
+    ▼
+Flask (port 5005)
+    ├── routes/auth.py        POST /api/auth/signup|login   GET /api/auth/me
+    ├── routes/questions.py   GET|POST /api/questions        GET|PUT|DELETE /api/questions/<id>
+    └── routes/attempts.py    POST /api/attempts             GET /api/attempts/<id|question/id>
+         │
+         ├── schemas.py       Pydantic validates every request before DB touch
+         ├── models/          SQLAlchemy ORM (User → Questions → Attempts)
+         └── services/
+              └── ai_feedback.py   Groq API call, category-aware prompt, JSON parse + fallback
+                   │
+                   ▼
+              Groq API (Llama 3.3 70B)
+```
 
-### Authentication: JWT Tokens
-- **Why**: Stateless, scalable, works well with SPAs
-- **Implementation**: Tokens stored in localStorage, verified on each protected request
-- **Trade-off**: No refresh token mechanism (fine for 24h assessment)
+### Database Schema
 
-### AI Integration: Claude API
-- **Why**: Superior reasoning ability for evaluating interview answers
-- **Prompt Design**: Structured JSON output ensures reliable parsing
-- **Fallback Handling**: Default values if API fails prevents crashes
-- **Cost Control**: Direct API calls (no caching, potential optimization point)
+```
+users         (id, email, password_hash, created_at)
+  └── questions (id, user_id→FK, title, content, expected_answer, category, difficulty, timestamps)
+        └── attempts (id, user_id→FK, question_id→FK, user_answer, ai_feedback, score, created_at)
+```
 
-### Validation: Pydantic Schemas
-- **Why**: Type-safe request validation, clear error messages
-- **Implementation**: All endpoints validate input before touching database
-- **Benefit**: Prevents invalid states, clear contracts between frontend/backend
+Cascade deletes: removing a user removes their questions; removing a question removes its attempts.
 
-### Frontend: React + Vite
-- **Why**: Modern, fast dev server, great DX
-- **Styling**: CSS modules for component scoping
-- **State**: React hooks for simplicity
+---
 
-## API Endpoints
+## Key Technical Decisions
+
+### 1. Flask App Factory Pattern
+`create_app()` in `app.py` initialises extensions, registers blueprints, and wires error handlers in one place. Makes testing easy — the test suite creates a fresh app instance with an in-memory DB.
+
+### 2. Pydantic Schemas at the Boundary
+Every POST/PUT request is validated by a Pydantic schema before touching the database. `category` and `difficulty` are validated against allowed value sets. Invalid requests fail fast with a clear 400 error — the database never sees bad data.
+
+```python
+VALID_CATEGORIES = {'General', 'System Design', 'Behavioral', 'Technical', 'Leadership'}
+VALID_DIFFICULTIES = {'Easy', 'Medium', 'Hard'}
+```
+
+### 3. Category-Aware AI Prompts
+The AI evaluation strategy changes based on question category:
+
+| Category | Evaluation focus |
+|---|---|
+| System Design | Requirements, scale estimation, architecture, DB choices, caching, trade-offs |
+| Behavioral | STAR method, specificity, quantified impact |
+| General/Technical | Accuracy, completeness, clarity |
+
+This is a single `if/elif` branch in `AIFeedbackService.evaluate_answer()` — easy to extend with new categories.
+
+### 4. User Isolation Enforced at Every Query
+Every query that reads or mutates data includes `filter_by(user_id=user_id)`. There is no way for User A to read, edit, or delete User B's questions or attempts — even with a valid JWT token.
+
+```python
+question = Question.query.filter_by(id=question_id, user_id=user_id).first()
+# Returns 404 if question exists but belongs to a different user
+```
+
+### 5. SQLite → PostgreSQL in One Line
+The database URI comes from an env var. Switching to Postgres in production is:
+```bash
+DATABASE_URL=postgresql://user:pass@host/db
+```
+No code changes needed.
+
+### 6. AI Decoupled in a Service Layer
+`AIFeedbackService` is the only file that knows about Groq. Routes call `ai_service.evaluate_answer(...)` and get back a plain dict. Swapping Groq for any other LLM means changing one file, nothing else.
+
+### 7. Axios Interceptors for Token Management
+The frontend uses an Axios request interceptor to attach the JWT token on every request (reading fresh from localStorage, not stale from module load). A response interceptor clears the token automatically on 401/422 to prevent infinite auth loops.
+
+---
+
+## AI Usage in This Project
+
+### How AI was used
+Claude (Claude Code) was used to scaffold components, write boilerplate routes, and generate test fixtures. All generated code was reviewed before use.
+
+### What was caught and fixed in review
+- **User isolation bug**: Generated `get_question_attempts()` returned all attempts for a question without filtering by `user_id`. Fixed by adding `filter_by(user_id=user_id)`.
+- **Stale token bug**: Generated `api.js` read the JWT token once at module load — stale after login. Fixed by moving to a request interceptor.
+- **Silent AI failures**: Generated fallback returned a hardcoded score with no logging. Fixed by adding `logger.error()` with the raw response for diagnosis.
+
+### AI guidance file
+`.claude/claude.md` constrains the AI with explicit rules:
+- Always validate with Pydantic before touching the DB
+- Always filter by `user_id` on every query
+- Always log errors with context before returning fallbacks
+- Never expose password hashes in API responses
+
+---
+
+## Observability
+
+Every request and response is logged:
+
+```
+2026-03-29 14:22:01 [INFO]  → POST /api/attempts
+2026-03-29 14:22:01 [INFO]  Requesting AI evaluation — category=System Design model=llama-3.3-70b-versatile
+2026-03-29 14:22:03 [INFO]  AI evaluation complete — score=78
+2026-03-29 14:22:03 [INFO]  ← 201 POST /api/attempts
+```
+
+AI failures log the raw response for diagnosis:
+```
+2026-03-29 14:22:03 [ERROR] Failed to parse AI response as JSON: ... Raw response: ...
+```
+
+---
+
+## Security Checklist
+
+- [x] Passwords hashed with bcrypt (never stored plain)
+- [x] JWT tokens verified on every protected route
+- [x] User isolation enforced at every DB query
+- [x] Pydantic rejects invalid input before DB access
+- [x] SQLAlchemy ORM prevents SQL injection
+- [x] CORS enabled (not wildcard)
+- [x] Error responses never leak stack traces or internal details
+- [x] `.env` excluded from git via `.gitignore`
+
+---
+
+## API Reference
 
 ### Auth
-- `POST /api/auth/signup` - Create account
-- `POST /api/auth/login` - Login
-- `GET /api/auth/me` - Get current user
+```
+POST  /api/auth/signup     { email, password }           → { access_token, user }
+POST  /api/auth/login      { email, password }           → { access_token, user }
+GET   /api/auth/me         [JWT required]                → { user }
+```
 
 ### Questions
-- `GET /api/questions` - List user's questions
-- `POST /api/questions` - Create question
-- `GET /api/questions/<id>` - Get question
-- `PUT /api/questions/<id>` - Update question
-- `DELETE /api/questions/<id>` - Delete question
-
-### Practice
-- `POST /api/attempts` - Submit answer, get feedback
-- `GET /api/attempts/<id>` - Get attempt details
-- `GET /api/attempts/question/<id>` - Get all attempts for question
-
-## AI Usage
-
-### Feedback Generation Flow
-1. User submits answer to a question
-2. Backend sends to Claude: question + expected answer + user answer
-3. Claude evaluates and returns: score (0-100), feedback, strengths, improvements
-4. Response validated and stored
-5. Formatted feedback returned to frontend
-
-### Prompt Design
 ```
-You are an expert interview coach evaluating a candidate's answer.
-
-Question: [question text]
-Expected/Ideal Answer Points: [key points]
-Candidate's Answer: [user answer]
-
-Evaluate the answer and respond with ONLY valid JSON:
-{
-    "score": <0-100>,
-    "feedback": "<assessment>",
-    "strengths": ["<strength 1>", "<strength 2>"],
-    "improvements": ["<improvement 1>", "<improvement 2>"]
-}
+GET   /api/questions              [JWT]  → [ questions ]
+POST  /api/questions              [JWT]  { title, content, category, difficulty, expected_answer }
+GET   /api/questions/<id>         [JWT]  → question
+PUT   /api/questions/<id>         [JWT]  { ...fields to update }
+DELETE /api/questions/<id>        [JWT]
 ```
 
-**Why this design**: Forces Claude into structured output, easy to parse, fallback handling for JSON errors.
-
-## Security & Data Protection
-
-- ✅ Passwords hashed with bcrypt before storage
-- ✅ JWT tokens validated on protected routes
-- ✅ User can only access their own questions/attempts
-- ✅ CORS configured (not wildcard)
-- ✅ Input validated with Pydantic schemas
-- ✅ SQLAlchemy prevents SQL injection
-- ✅ Error messages don't leak sensitive info
-
-## Testing
-
-Run backend tests:
-```bash
-cd backend
-pytest tests/
+### Attempts
+```
+POST  /api/attempts               [JWT]  { question_id, user_answer }  → { score, feedback, strengths, improvements }
+GET   /api/attempts/<id>          [JWT]  → attempt
+GET   /api/attempts/question/<id> [JWT]  → [ attempts ]
 ```
 
-Test coverage:
-- Authentication flows
-- Question CRUD operations
-- Attempt submission and feedback
-- Input validation
-- User isolation
+---
 
-## Known Limitations
+## Known Limitations & Production Path
 
-1. **SQLite**: Not suitable for concurrent users (would use PostgreSQL in production)
-2. **No refresh tokens**: JWT tokens expire after 30 days
-3. **No rate limiting**: API endpoints unlimited (should add in production)
-4. **Sync-only**: No real-time updates (would use WebSockets)
-5. **Simple auth**: No email verification or password recovery
-6. **No AI response caching**: Every identical question re-evaluated (could optimize)
+| Limitation | Production fix |
+|---|---|
+| SQLite (no concurrent writes) | Switch `DATABASE_URL` to PostgreSQL |
+| No rate limiting | Add Flask-Limiter on `/api/attempts` |
+| JWT only (no refresh tokens) | Add refresh token endpoint |
+| No email verification | Add SendGrid/Resend on signup |
+| AI responses not cached | Cache identical question+answer pairs in Redis |
+| No DB migrations | Add Alembic for schema versioning |
+
+---
 
 ## Potential Extensions
 
-1. **Analytics Dashboard**: Track score trends, weak categories
-2. **AI-Generated Variations**: Ask Claude to create question variants for practice
-3. **Study Guides**: Generate personalized study materials based on weaknesses
-4. **Peer Learning**: Share questions, discuss answers
-5. **Scheduled Reviews**: Spaced repetition of difficult questions
-6. **Export to PDF**: Download performance reports
+1. **Spaced Repetition** — resurface questions where score < 70 after N days
+2. **Mock Interview Sessions** — timed sessions with multiple questions in sequence
+3. **Analytics Dashboard** — score trends by category, weakest topics
+4. **AI Question Generator** — generate question variants from a seed question
+5. **Export to PDF** — download performance report for a session
 
-## AI Guidance Files
+---
 
-See `.claude/claude.md` for:
-- Code standards and practices
-- AI integration rules
-- Security checklist
-- Testing strategy
-- Extension points
-
-## File Structure
+## Project Structure
 
 ```
 interview-prep-assessment/
 ├── backend/
-│   ├── models/                # Database models
-│   │   ├── user.py
-│   │   ├── question.py
-│   │   └── attempt.py
-│   ├── routes/                # API endpoints
-│   │   ├── auth.py
-│   │   ├── questions.py
-│   │   └── attempts.py
-│   ├── services/              # Business logic
-│   │   └── ai_feedback.py
-│   ├── schemas.py             # Pydantic validation
-│   ├── config.py
-│   ├── app.py                 # Flask app factory
+│   ├── models/
+│   │   ├── __init__.py        SQLAlchemy db instance
+│   │   ├── user.py            User model, bcrypt hashing
+│   │   ├── question.py        Question model
+│   │   └── attempt.py         Attempt model (stores AI feedback + score)
+│   ├── routes/
+│   │   ├── auth.py            Signup, login, /me
+│   │   ├── questions.py       Question CRUD + auto-seed on first login
+│   │   └── attempts.py        Submit answer, get AI feedback
+│   ├── services/
+│   │   └── ai_feedback.py     Groq API, category-aware prompts, fallback handling
+│   ├── tests/
+│   │   ├── conftest.py        Fixtures, in-memory DB, helpers
+│   │   ├── test_auth.py       Auth flow tests
+│   │   ├── test_questions.py  CRUD + isolation tests
+│   │   └── test_attempts.py   Feedback + isolation tests (AI mocked)
+│   ├── app.py                 Flask factory, logging, error handlers
+│   ├── config.py              Config from env vars
+│   ├── schemas.py             Pydantic request schemas + validators
+│   ├── seed.py                Demo user + 9 sample questions
 │   └── requirements.txt
 ├── frontend/
-│   ├── src/
-│   │   ├── components/        # React components
-│   │   ├── hooks/             # Custom hooks
-│   │   ├── services/          # API client
-│   │   ├── App.jsx
-│   │   └── main.jsx
-│   └── package.json
+│   └── src/
+│       ├── components/
+│       │   ├── Auth.jsx       Login / signup forms
+│       │   ├── Dashboard.jsx  Question list, filters
+│       │   ├── QuestionCard.jsx
+│       │   ├── QuestionForm.jsx
+│       │   └── PracticeMode.jsx  Answer input, system design guide, feedback display
+│       ├── hooks/useAuth.js   Auth state management
+│       ├── services/api.js    Axios client with JWT interceptors
+│       └── App.jsx
 ├── .claude/
-│   └── claude.md              # AI guidance
+│   └── claude.md              AI coding constraints and standards
 ├── .env.example
 └── README.md
 ```
 
-## Demo Flow
+---
 
-1. Sign up with test email
-2. Create 2-3 interview questions
-3. Click "Practice" on a question
-4. Answer the question
-5. View AI feedback with score and suggestions
-6. Try again to improve score
+## Demo
 
-## Attribution
+Log in as the demo user (after running `python -m backend.seed`):
 
-This project demonstrates:
-- Clean code architecture with separation of concerns
-- Proper authentication and authorization
-- AI integration with proper error handling
-- Full-stack development with Python/React
-- Type safety and validation
-- Clear technical documentation
+```
+Email:    demo@example.com
+Password: demo123
+```
 
-All code written specifically for this assessment.
+Then: pick any System Design question → click Practice → write a rough answer → see the AI evaluate it across architecture, scalability, and trade-offs.

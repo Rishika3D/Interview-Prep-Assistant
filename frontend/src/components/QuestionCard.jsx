@@ -54,9 +54,11 @@ export default function QuestionCard({ question, onDelete }) {
         >
           Practice
         </button>
-        <button onClick={onDelete} className="danger-btn">
-          Delete
-        </button>
+        {onDelete && (
+          <button onClick={onDelete} className="danger-btn">
+            Delete
+          </button>
+        )}
       </div>
     </div>
   );

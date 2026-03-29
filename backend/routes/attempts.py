@@ -67,5 +67,5 @@ def get_question_attempts(question_id):
     if not question:
         return jsonify({'error': 'Question not found'}), 404
 
-    attempts = Attempt.query.filter_by(question_id=question_id).all()
+    attempts = Attempt.query.filter_by(question_id=question_id, user_id=user_id).all()
     return jsonify([a.to_dict() for a in attempts]), 200

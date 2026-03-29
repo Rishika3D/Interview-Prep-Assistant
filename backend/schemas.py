@@ -1,5 +1,8 @@
-from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
+from pydantic import BaseModel, EmailStr, Field, field_validator
+from typing import Optional, Literal
+
+VALID_CATEGORIES = {'General', 'System Design', 'Behavioral', 'Technical', 'Leadership'}
+VALID_DIFFICULTIES = {'Easy', 'Medium', 'Hard'}
 
 class SignupRequest(BaseModel):
     email: EmailStr
@@ -16,12 +19,40 @@ class QuestionCreate(BaseModel):
     category: str = Field(default='General', max_length=100)
     difficulty: str = Field(default='Medium')
 
+    @field_validator('category')
+    @classmethod
+    def validate_category(cls, v):
+        if v not in VALID_CATEGORIES:
+            raise ValueError(f"category must be one of: {', '.join(sorted(VALID_CATEGORIES))}")
+        return v
+
+    @field_validator('difficulty')
+    @classmethod
+    def validate_difficulty(cls, v):
+        if v not in VALID_DIFFICULTIES:
+            raise ValueError(f"difficulty must be one of: {', '.join(sorted(VALID_DIFFICULTIES))}")
+        return v
+
 class QuestionUpdate(BaseModel):
     title: Optional[str] = None
     content: Optional[str] = None
     expected_answer: Optional[str] = None
     category: Optional[str] = None
     difficulty: Optional[str] = None
+
+    @field_validator('category')
+    @classmethod
+    def validate_category(cls, v):
+        if v is not None and v not in VALID_CATEGORIES:
+            raise ValueError(f"category must be one of: {', '.join(sorted(VALID_CATEGORIES))}")
+        return v
+
+    @field_validator('difficulty')
+    @classmethod
+    def validate_difficulty(cls, v):
+        if v is not None and v not in VALID_DIFFICULTIES:
+            raise ValueError(f"difficulty must be one of: {', '.join(sorted(VALID_DIFFICULTIES))}")
+        return v
 
 class AttemptCreate(BaseModel):
     question_id: int

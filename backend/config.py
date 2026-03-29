@@ -11,4 +11,4 @@ class Config:
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(days=30)
 
     # API
-    ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
+    GROQ_API_KEY = os.getenv('GROQ_API_KEY')

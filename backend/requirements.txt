@@ -4,6 +4,6 @@ Flask-JWT-Extended==4.5.3
 Flask-CORS==4.0.0
 python-dotenv==1.0.0
 bcrypt==4.1.2
-anthropic==0.28.0
-pydantic==2.5.0
+groq
+pydantic>=2.9.0
 pytest==7.4.3

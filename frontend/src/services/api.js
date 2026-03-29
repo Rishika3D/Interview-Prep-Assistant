@@ -1,15 +1,30 @@
 import axios from 'axios';
 
 const API_BASE = '/api';
-const token = localStorage.getItem('token');
 
-const api = axios.create({
-  baseURL: API_BASE,
-  headers: token ? { Authorization: `Bearer ${token}` } : {}
+const api = axios.create({ baseURL: API_BASE });
+
+// Attach token from localStorage on every request (not just at load time)
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token && token !== 'null' && token !== 'undefined') config.headers.Authorization = `Bearer ${token}`;
+  return config;
 });
 
+// Clear stale token automatically on 401/403
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401 || err.response?.status === 422) {
+      localStorage.removeItem('token');
+      delete api.defaults.headers.Authorization;
+    }
+    return Promise.reject(err);
+  }
+);
+
 export const setAuthToken = (token) => {
-  if (token) {
+  if (token && token !== 'null' && token !== 'undefined') {
     api.defaults.headers.Authorization = `Bearer ${token}`;
     localStorage.setItem('token', token);
   } else {
